@@ -29,13 +29,76 @@ class Charity {
         $this->representative_email = $representative_email;
     }
 }
+class Tracker {
+    private $charities = array();
+    private $donations = array();
+
+    public function addCharity($name, $email) {
+        $charity = new Charity($name, $email);
+        $this->charities[$charity->id] = $charity;
+    }
+
+    private function isCharityDuplicated($name, $email) {
+        foreach ($this->charities as $charity) {
+            if ($charity->name === $name && 
+                $charity->representative_email === $email) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function importCharitiesFromCsv($filename) {
+        if (!file_exists($filename)) {
+            echo "File $filename not found.\n";
+            return;
+        }
+        
+        $file = fopen($filename, 'r');
+        fgetcsv($file);
+
+        $new_charities = 0;
+        
+        while (($row = fgetcsv($file)) !== false) {
+            if (count($row) != 2) {
+                echo "Skipping invalid row: " . implode(', ', $row) . "\n";
+                continue;
+            }
+            list($name, $email) = $row;
+            if ($this->isCharityDuplicated($name, $email)) {
+                echo "Skipping duplicated charity: $name\n";
+                continue;
+            } else {
+                $new_charities++;
+                $this->addCharity($name, $email);
+            }
+        }
+        
+        fclose($file);
+
+        echo ("$new_charities new charities added.\n");
+    }
+
+    public function viewCharities() {
+        if (empty($this->charities)) {
+            echo "No charities found.\n";
+        } else {
+            foreach ($this->charities as $charity) {
+                echo "$charity->name\n";
+            }
+        }
+    }
+
+}
 
 function main () {
+    $tracker = new Tracker();
+
+    echo "\nWelcome to donation tracker!\n";
 
     do {
-        echo "\nWelcome to donation tracker!\n";
         echo "\nSelect an option: \n";
-        echo "1. Import charities in CSV \n";
+        echo "1. Import charities from CSV \n";
         echo "2. View charities \n";
         echo "3. Add charity \n";
         echo "4. Edit charity \n";
@@ -46,10 +109,13 @@ function main () {
 
         switch ($selected_option) {
             case '1':
-                echo "You selected option 1 \n";
+                echo "You selected option 1 \n\n";
+                $csv_filename = readline("Enter the CSV filename: ");
+                $tracker->importCharitiesFromCsv($csv_filename);
                 break;
             case '2':
                 echo "You selected option 2 \n";
+                $tracker->viewCharities();
                 break;
             case '3':
                 echo "You selected option 3 \n";
