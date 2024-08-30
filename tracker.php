@@ -42,7 +42,6 @@ class Tracker {
             echo "Duplicated charity: $name\n";
             return false;
         } else if (!$this->isNameValid($name) || !$this->isEmailValid($email)) {
-            echo "Invalid format charity: $name\n";
             return false;
         } else {
             $charity = new Charity($name, $email);
@@ -55,6 +54,7 @@ class Tracker {
         foreach ($this->charities as $charity) {
             if ($charity->name === $name && 
                 $charity->representative_email === $email) {
+                echo "Duplicated charity: $name\n";
                 return true;
             }
         }
@@ -63,23 +63,46 @@ class Tracker {
 
     private function isNameValid($name) {
         if (!preg_match("/^[a-zA-Z-' ]*$/",$name) || strlen($name) > $this->MAX_NAME_LENGTH) {
-            echo "Invalid name format\n";
+            echo "Invalid name: $name\n";
             return false;
         }
         return true;
     }
     private function isEmailValid($email) {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > $this->MAX_EMAIL_LENGTH) {
-            echo "Invalid email format\n";
+            echo "Invalid email: $email\n";
             return false;
         }
         return true;
     }
-    private function printHeader() {
+    private function printCharitiesHeader() {
         echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
         echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-{$this->MAX_EMAIL_LENGTH}s |\n", "ID", "Name", "Representative Email");
         echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
     }
+
+    private function printDonationsHeader() {
+        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', 10), str_repeat('-', $this->ID_LENGTH), str_repeat('-', 19));
+        echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-10s | %-{$this->ID_LENGTH}s | %-19s |\n", "ID", "Donor Name", "Amount", "Charity ID", "Date Time");
+        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', 10), str_repeat('-', $this->ID_LENGTH), str_repeat('-', 19));
+    }
+
+    private function printDonationsByCharity($charity_id) {
+        $this->printDonationsHeader();
+        foreach ($this->donations as $donation) {
+            if ($donation->charity_id === $charity_id) {
+                echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-10s | %-{$this->ID_LENGTH}s | %-19s |\n", 
+                    $donation->id, 
+                    $donation->donor_name, 
+                    $donation->amount, 
+                    $donation->charity_id, 
+                    $donation->date_time
+                );
+            }
+        }
+        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', 10), str_repeat('-', $this->ID_LENGTH), str_repeat('-', 19));
+    }
+    
 
     public function importCharitiesFromCsv($filename) {
         if (!file_exists($filename)) {
@@ -98,7 +121,7 @@ class Tracker {
                 continue;
             }
             list($name, $email) = $row;
-            if (!$this->addCharity($name, $email)) {
+            if ($this->addCharity($name, $email)) {
                 $new_charities++;
             }
         }
@@ -112,14 +135,24 @@ class Tracker {
         if (empty($this->charities)) {
             echo "No charities found.\n";
         } else {
-            $this->printHeader();
+            $this->printCharitiesHeader();
             foreach ($this->charities as $charity) {
                 echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-{$this->MAX_EMAIL_LENGTH}s |\n", 
                 $charity->id, 
                 $charity->name, 
                 $charity->representative_email
-            );            }
-            echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
+                );            
+            }
+            echo sprintf("+-%s-+-%s-+-%s-+\n\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
+            $charity_id = readline("Enter charity ID to view donations (press enter to skip): ");
+            if (isset($this->charities[$charity_id])) {
+                echo "Donations for charity: " . $this->charities[$charity_id]->name . "\n";
+                $this->printDonationsByCharity($charity_id);
+            } else if ($charity_id == '') {
+                return;
+            } else {
+                echo "Charity not found.\n";
+            }   
         }
     }
 
@@ -147,6 +180,30 @@ class Tracker {
         echo "Charity updated succesfully.\n";
     }
 
+    public function deleteCharity($charity_id) {
+        if (!isset($this->charities[$charity_id])) {
+            echo "Charity not found.\n";
+            return;
+        }
+        unset($this->charities[$charity_id]);
+        echo "Charity deleted succesfully.\n";
+    }
+
+    public function addDonation($donor_name, $amount, $charity_id) {
+        if (!isset($this->charities[$charity_id])) {
+            echo "Charity not found.\n";
+            return;
+        }
+        if (!$this->isNameValid($donor_name)) {
+            return;
+        } else if (!is_numeric($amount) || $amount <= 0 || !preg_match('/^\d+(\.\d{1,2})?$/', $amount)) {
+            echo "Invalid donation amount.\n";
+            return;
+        }
+        $donation = new Donation($donor_name, $amount, $charity_id);
+        $this->donations[] = $donation;
+        echo "Donation added succesfully.\n";
+    }
 
 }
 
@@ -162,9 +219,10 @@ function main () {
         echo "3. Add charity \n";
         echo "4. Edit charity \n";
         echo "5. Delete charity \n";
-        echo "6. Add donation \n\n";
+        echo "6. Add donation \n";
+        echo "7. Exit \n\n";
 
-        $selected_option = readline("Enter option (1-6) or enter X to exit: ");
+        $selected_option = readline("Enter option (1-7): ");
 
         switch ($selected_option) {
             case '1':
@@ -179,8 +237,6 @@ function main () {
                 $email = readline("Enter representative email: ");
                 if ($tracker->addCharity($name, $email)) {
                     echo "Charity added successfully.\n";
-                } else {
-                    echo "Failed to add charity because of invalid format. Try again.\n";
                 }
                 break;
             case '4':
@@ -190,12 +246,16 @@ function main () {
                 $tracker->editCharity($charity_id, $name ?: null, $email ?: null);
                 break;
             case '5':
-                echo "You selected option 5 \n";
+                $charity_id = readline("Enter charity ID to delete: ");
+                $tracker->deleteCharity($charity_id);
                 break;
             case '6':
-                echo "You selected option 6 \n";
+                $donor_name = readline("Enter donor name: ");
+                $amount = readline("Enter donation amount: ");
+                $charity_id = readline("Enter charity ID: ");
+                $tracker->addDonation($donor_name, $amount, $charity_id);
                 break;
-            case 'X':
+            case '7':
                 exit();
             default:
                 echo "\nInvalid option selected. Please try again. \n";
