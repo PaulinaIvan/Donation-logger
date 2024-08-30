@@ -30,12 +30,25 @@ class Charity {
     }
 }
 class Tracker {
+    
+    private $ID_LENGTH = 13;
+    private $MAX_NAME_LENGTH = 30;
+    private $MAX_EMAIL_LENGTH = 30;
     private $charities = array();
     private $donations = array();
 
     public function addCharity($name, $email) {
-        $charity = new Charity($name, $email);
-        $this->charities[$charity->id] = $charity;
+        if ($this->isCharityDuplicated($name, $email)) {
+            echo "Duplicated charity: $name\n";
+            return false;
+        } else if (!$this->isNameValid($name) || !$this->isEmailValid($email)) {
+            echo "Invalid format charity: $name\n";
+            return false;
+        } else {
+            $charity = new Charity($name, $email);
+            $this->charities[$charity->id] = $charity;
+            return true;
+        }
     }
 
     private function isCharityDuplicated($name, $email) {
@@ -46,6 +59,26 @@ class Tracker {
             }
         }
         return false;
+    }
+
+    private function isNameValid($name) {
+        if (!preg_match("/^[a-zA-Z-' ]*$/",$name) || strlen($name) > $this->MAX_NAME_LENGTH) {
+            echo "Invalid name format\n";
+            return false;
+        }
+        return true;
+    }
+    private function isEmailValid($email) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > $this->MAX_EMAIL_LENGTH) {
+            echo "Invalid email format\n";
+            return false;
+        }
+        return true;
+    }
+    private function printHeader() {
+        echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
+        echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-{$this->MAX_EMAIL_LENGTH}s |\n", "ID", "Name", "Representative Email");
+        echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
     }
 
     public function importCharitiesFromCsv($filename) {
@@ -65,12 +98,8 @@ class Tracker {
                 continue;
             }
             list($name, $email) = $row;
-            if ($this->isCharityDuplicated($name, $email)) {
-                echo "Skipping duplicated charity: $name\n";
-                continue;
-            } else {
+            if (!$this->addCharity($name, $email)) {
                 $new_charities++;
-                $this->addCharity($name, $email);
             }
         }
         
@@ -83,11 +112,41 @@ class Tracker {
         if (empty($this->charities)) {
             echo "No charities found.\n";
         } else {
+            $this->printHeader();
             foreach ($this->charities as $charity) {
-                echo "$charity->name\n";
-            }
+                echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-{$this->MAX_EMAIL_LENGTH}s |\n", 
+                $charity->id, 
+                $charity->name, 
+                $charity->representative_email
+            );            }
+            echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
         }
     }
+
+    public function editCharity($charity_id, $name = null, $email = null) {
+        if (!isset($this->charities[$charity_id])) {
+            echo "Charity not found.\n";
+            return;
+        }
+        $charity = $this->charities[$charity_id];
+        $oldCharity = clone $charity;
+        if ($name !== null) {
+            if ($this->isNameValid($name)) {
+                $charity->name = $name;
+            } else {
+                return;
+            }
+        }
+        if ($email !== null) {
+            if ($this->isEmailValid($email)) {
+                $charity->representative_email = $email;
+            } else {
+                return;
+            }
+        }
+        echo "Charity updated succesfully.\n";
+    }
+
 
 }
 
@@ -109,19 +168,26 @@ function main () {
 
         switch ($selected_option) {
             case '1':
-                echo "You selected option 1 \n\n";
                 $csv_filename = readline("Enter the CSV filename: ");
                 $tracker->importCharitiesFromCsv($csv_filename);
                 break;
             case '2':
-                echo "You selected option 2 \n";
                 $tracker->viewCharities();
                 break;
             case '3':
-                echo "You selected option 3 \n";
+                $name = readline("Enter charity name: ");
+                $email = readline("Enter representative email: ");
+                if ($tracker->addCharity($name, $email)) {
+                    echo "Charity added successfully.\n";
+                } else {
+                    echo "Failed to add charity because of invalid format. Try again.\n";
+                }
                 break;
             case '4':
-                echo "You selected option 4 \n";
+                $charity_id = readline("Enter charity ID to edit: ");
+                $name = readline("Enter new name (press enter to skip): ");
+                $email = readline("Enter new email (press enter to skip): ");
+                $tracker->editCharity($charity_id, $name ?: null, $email ?: null);
                 break;
             case '5':
                 echo "You selected option 5 \n";
