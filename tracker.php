@@ -2,44 +2,199 @@
 
 class Donation {
 
-    public $id;
-    public $donor_name;
-    public $amount;
-    public $charity_id;
-    public $date_time;
+    private $id;
+    private $donor_name;
+    private $amount;
+    private $charity_id;
+    private $date_time;
 
     public function __construct($donor_name, $amount, $charity_id) {
         $this->id = uniqid();
-        $this->donor_name = $donor_name;
-        $this->amount = $amount;
-        $this->charity_id = $charity_id;
+        $this->__set('donor_name', $donor_name);
+        $this->__set('amount', $amount);
+        $this->__set('charity_id', $charity_id);
         $this->date_time = date('Y-m-d H:i:s');
     }
+
+    public function __get($property) {
+        if (property_exists($this, $property)) {
+            return $this->$property;
+        }
+        throw new Exception("Property $property does not exist on Charity.");
+    }
+
+    public function __set($name, $value) {
+        switch ($name) {
+            case 'donor_name':
+                $this->donor_name = $value;
+                break;
+            case 'amount':
+                $this->amount = $value;
+                break;
+            case 'charity_id':
+                $this->charity_id = $value;
+                break;
+            default:
+                throw new Exception("Cannot set property $name on Donation.");
+        }
+    }
+
+    public function donationToRow($id_length, $max_name_length) {
+        return sprintf("| %-{$id_length}s | %-{$max_name_length}s | %-10s | %-{$id_length}s | %-19s |\n", 
+            $this->id, 
+            $this->donor_name, 
+            $this->amount, 
+            $this->charity_id, 
+            $this->date_time
+        );  
+    }
+
 }
 
 class Charity {
 
-    public $id;
-    public $name;
-    public $representative_email;
+    private $id;
+    private $name;
+    private $representative_email;
 
     public function __construct($name, $representative_email) {
         $this->id = uniqid();
-        $this->name = $name;
-        $this->representative_email = $representative_email;
+        $this->__set('name', $name);
+        $this->__set('representative_email', $representative_email);
+    }
+
+    public function __get($property) {
+        if (property_exists($this, $property)) {
+            return $this->$property;
+        }
+        throw new Exception("Property $property does not exist on Charity.");
+    }
+
+    public function __set($property, $value) {
+        switch ($property) {
+            case 'name':
+                $this->name = $value;
+                break;
+            case 'representative_email':
+                $this->representative_email = $value;
+                break;
+            default:
+                throw new Exception("Cannot set property $property on Charity.");
+        }
+    }
+
+    public function charityToRow($id_length, $max_name_length, $max_email_length) {
+        return sprintf("| %-{$id_length}s | %-{$max_name_length}s | %-{$max_email_length}s |\n", 
+            $this->id, 
+            $this->name, 
+            $this->representative_email
+        );  
     }
 }
+
 class Tracker {
-    
-    private $ID_LENGTH = 13;
-    private $MAX_NAME_LENGTH = 30;
-    private $MAX_EMAIL_LENGTH = 30;
     private $charities = array();
     private $donations = array();
+    private $max_name_length;
+    private $max_email_length;
+    private $id_length;
 
-    public function addCharity($name, $email) {
+    public function __construct($max_name_length, $max_email_length, $id_length) {
+        $this->__set('max_name_length', $max_name_length);
+        $this->__set('max_email_length', $max_email_length);
+        $this->__set('id_length', $id_length);
+    }
+
+    public function __get($property) {
+        if (property_exists($this, $property)) {
+            return $this->$property;
+        }
+        throw new Exception("Property $property does not exist on Charity.");
+    }
+
+    public function __set($property, $value) {
+        switch ($property) {
+            case 'max_name_length':
+                $this->max_name_length = $value;
+                break;
+            case 'max_email_length':
+                $this->max_email_length = $value;
+                break;
+            case 'id_length':
+                $this->id_length = $value;
+                break;
+            default:
+                throw new Exception("Cannot set property $property on Charity.");
+        }
+    }
+
+    private function isNameValid($name) {
+        if (!preg_match("/^[a-zA-Z-' ]*$/",$name) || strlen($name) > $this->max_name_length) {
+            echo "Invalid name: $name\n";
+            return false;
+        }
+        return true;
+    }
+
+    private function isEmailValid($email) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > $this->max_email_length) {
+            echo "Invalid email: $email\n";
+            return false;
+        }
+        return true;
+    }
+
+    private function isAmountValid($amount) {
+        if (!is_numeric($amount) || $amount <= 0 || !preg_match('/^\d+(\.\d{1,2})?$/', $amount)) {
+            echo "Invalid donation amount: $amount\n";
+            return false;
+        }
+        return true;
+    }
+
+    private function isCharityDuplicated($name, $email) {
+        foreach ($this->charities as $charity) {
+            if (is_object($charity) && $charity->name === $name && 
+                $charity->representative_email === $email) {
+                echo "Duplicated charity: $name\n";
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function printCharitiesHeader() {
+        $this->printCharitiesFooter();
+        echo sprintf("| %-13s | %-30s | %-30s |\n", "ID", "Name", "Representative Email");
+        $this->printCharitiesFooter();
+    }
+
+    private function printCharitiesFooter() {
+        echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->id_length), str_repeat('-', $this->max_name_length), str_repeat('-', $this->max_email_length));
+    }
+
+    private function printDonationsHeader() {
+        $this->printDonationsFooter();
+        echo sprintf("| %-13s | %-30s | %-10s | %-13s | %-19s |\n", "ID", "Donor Name", "Amount", "Charity ID", "Date Time");
+        $this->printDonationsFooter();
+    }
+
+    private function printDonationsFooter() {
+        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->id_length), str_repeat('-', $this->max_name_length), str_repeat('-', 10), str_repeat('-', $this->id_length), str_repeat('-', 19));
+    }
+
+    private function printDonationsByCharity($charity_id) {
+        $this->printDonationsHeader();
+        foreach ($this->donations as $donation) {
+            if ($donation->charity_id === $charity_id) {
+                echo $donation->donationToRow($this->id_length, $this->max_name_length);
+            }
+        }
+        $this->printDonationsFooter();
+    }
+
+    public function addCharity($name,  $email) {
         if ($this->isCharityDuplicated($name, $email)) {
-            echo "Duplicated charity: $name\n";
             return false;
         } else if (!$this->isNameValid($name) || !$this->isEmailValid($email)) {
             return false;
@@ -49,60 +204,6 @@ class Tracker {
             return true;
         }
     }
-
-    private function isCharityDuplicated($name, $email) {
-        foreach ($this->charities as $charity) {
-            if ($charity->name === $name && 
-                $charity->representative_email === $email) {
-                echo "Duplicated charity: $name\n";
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isNameValid($name) {
-        if (!preg_match("/^[a-zA-Z-' ]*$/",$name) || strlen($name) > $this->MAX_NAME_LENGTH) {
-            echo "Invalid name: $name\n";
-            return false;
-        }
-        return true;
-    }
-    private function isEmailValid($email) {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > $this->MAX_EMAIL_LENGTH) {
-            echo "Invalid email: $email\n";
-            return false;
-        }
-        return true;
-    }
-    private function printCharitiesHeader() {
-        echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
-        echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-{$this->MAX_EMAIL_LENGTH}s |\n", "ID", "Name", "Representative Email");
-        echo sprintf("+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
-    }
-
-    private function printDonationsHeader() {
-        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', 10), str_repeat('-', $this->ID_LENGTH), str_repeat('-', 19));
-        echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-10s | %-{$this->ID_LENGTH}s | %-19s |\n", "ID", "Donor Name", "Amount", "Charity ID", "Date Time");
-        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', 10), str_repeat('-', $this->ID_LENGTH), str_repeat('-', 19));
-    }
-
-    private function printDonationsByCharity($charity_id) {
-        $this->printDonationsHeader();
-        foreach ($this->donations as $donation) {
-            if ($donation->charity_id === $charity_id) {
-                echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-10s | %-{$this->ID_LENGTH}s | %-19s |\n", 
-                    $donation->id, 
-                    $donation->donor_name, 
-                    $donation->amount, 
-                    $donation->charity_id, 
-                    $donation->date_time
-                );
-            }
-        }
-        echo sprintf("+-%s-+-%s-+-%s-+-%s-+-%s-+\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', 10), str_repeat('-', $this->ID_LENGTH), str_repeat('-', 19));
-    }
-    
 
     public function importCharitiesFromCsv($filename) {
         if (!file_exists($filename)) {
@@ -137,13 +238,9 @@ class Tracker {
         } else {
             $this->printCharitiesHeader();
             foreach ($this->charities as $charity) {
-                echo sprintf("| %-{$this->ID_LENGTH}s | %-{$this->MAX_NAME_LENGTH}s | %-{$this->MAX_EMAIL_LENGTH}s |\n", 
-                $charity->id, 
-                $charity->name, 
-                $charity->representative_email
-                );            
+                echo $charity->charityToRow($this->id_length, $this->max_name_length, $this->max_email_length);         
             }
-            echo sprintf("+-%s-+-%s-+-%s-+\n\n", str_repeat('-', $this->ID_LENGTH), str_repeat('-', $this->MAX_NAME_LENGTH), str_repeat('-', $this->MAX_EMAIL_LENGTH));
+            $this->printCharitiesFooter();
             $charity_id = readline("Enter charity ID to view donations (press enter to skip): ");
             if (isset($this->charities[$charity_id])) {
                 echo "Donations for charity: " . $this->charities[$charity_id]->name . "\n";
@@ -162,7 +259,6 @@ class Tracker {
             return;
         }
         $charity = $this->charities[$charity_id];
-        $oldCharity = clone $charity;
         if ($name !== null) {
             if ($this->isNameValid($name)) {
                 $charity->name = $name;
@@ -196,8 +292,7 @@ class Tracker {
         }
         if (!$this->isNameValid($donor_name)) {
             return;
-        } else if (!is_numeric($amount) || $amount <= 0 || !preg_match('/^\d+(\.\d{1,2})?$/', $amount)) {
-            echo "Invalid donation amount.\n";
+        } else if (!$this->isAmountValid($amount)) {
             return;
         }
         $donation = new Donation($donor_name, $amount, $charity_id);
@@ -208,7 +303,7 @@ class Tracker {
 }
 
 function main () {
-    $tracker = new Tracker();
+    $tracker = new Tracker(id_length: 13, max_name_length: 30, max_email_length: 30);
 
     echo "\nWelcome to donation tracker!\n";
 
